@@ -1,0 +1,359 @@
+<!-- EJS Template untuk Company Profile dengan API Laravel -->
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Company Profile - Program Donasi</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <style>
+        .campaign-card {
+            transition: transform 0.3s ease;
+            border: none;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .campaign-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+        
+        .campaign-image {
+            height: 200px;
+            object-fit: cover;
+        }
+        
+        .campaign-category {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .campaign-target {
+            color: #28a745;
+            font-weight: bold;
+        }
+        
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 2s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header Section -->
+    <header class="bg-primary text-white text-center py-5">
+        <div class="container">
+            <h1 class="display-4">PT. Example Company</h1>
+            <p class="lead">Bergabunglah dengan kami dalam berbagi kebaikan</p>
+        </div>
+    </header>
+
+    <!-- Campaign Section -->
+    <section class="py-5">
+        <div class="container">
+            <h2 class="text-center mb-5">Program Donasi Pilihan Kami</h2>
+            
+            <!-- Loading State -->
+            <div id="loadingSection" class="text-center">
+                <div class="loading-spinner"></div>
+                <p>Memuat program donasi...</p>
+            </div>
+            
+            <!-- Error State -->
+            <div id="errorSection" class="text-center text-danger" style="display: none;">
+                <div class="alert alert-danger" role="alert">
+                    <h4 class="alert-heading">Gagal Memuat Data!</h4>
+                    <p>Maaf, terjadi kesalahan saat memuat program donasi.</p>
+                    <button class="btn btn-outline-danger" onclick="retryLoadCampaigns()">
+                        Coba Lagi
+                    </button>
+                </div>
+            </div>
+            
+            <!-- No Data State -->
+            <div id="noDataSection" class="text-center text-muted" style="display: none;">
+                <div class="alert alert-info" role="alert">
+                    <h4 class="alert-heading">Belum Ada Program</h4>
+                    <p>Saat ini belum ada program donasi yang tersedia.</p>
+                </div>
+            </div>
+            
+            <!-- Campaigns Grid -->
+            <div id="campaignsGrid" class="row" style="display: none;">
+                <!-- Campaign cards akan dimuat di sini -->
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="bg-light py-5">
+        <div class="container text-center">
+            <h3>Ingin Melihat Program Lainnya?</h3>
+            <p class="lead">Kunjungi website donasi kami untuk melihat semua program yang tersedia</p>
+            <a href="#" id="visitMainSite" class="btn btn-primary btn-lg">
+                Kunjungi Website Donasi
+            </a>
+        </div>
+    </section>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // KONFIGURASI API LARAVEL
+        const API_CONFIG = {
+            // Ganti dengan URL website donasi Laravel Anda
+            baseUrl: 'http://localhost:8000', // URL Laravel donasi
+            endpoints: {
+                campaigns: '/api/campaigns',
+                featuredCampaigns: '/api/campaigns/featured'
+            },
+            // Pengaturan tambahan
+            campaignLimit: 6,
+            timeout: 10000,
+            retryAttempts: 3
+        };
+
+        // Elements
+        const loadingSection = document.getElementById('loadingSection');
+        const errorSection = document.getElementById('errorSection');
+        const noDataSection = document.getElementById('noDataSection');
+        const campaignsGrid = document.getElementById('campaignsGrid');
+        const visitMainSite = document.getElementById('visitMainSite');
+
+        // Set main site link
+        visitMainSite.href = API_CONFIG.baseUrl;
+
+        // State Management
+        let currentRetryAttempt = 0;
+
+        // Function untuk load campaigns dari Laravel API
+        async function loadCampaigns() {
+            try {
+                showLoading();
+                
+                // Build API URL
+                const apiUrl = `${API_CONFIG.baseUrl}${API_CONFIG.endpoints.campaigns}?limit=${API_CONFIG.campaignLimit}&base_url=${API_CONFIG.baseUrl}`;
+                
+                console.log('🚀 Fetching campaigns from:', apiUrl);
+
+                // Fetch dengan timeout
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.timeout);
+
+                const response = await fetch(apiUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                console.log('✅ API Response:', data);
+
+                // Handle response
+                if (data.success && data.data && data.data.campaigns && data.data.campaigns.length > 0) {
+                    displayCampaigns(data.data.campaigns);
+                    currentRetryAttempt = 0; // Reset retry counter
+                } else {
+                    showNoData();
+                }
+
+            } catch (error) {
+                console.error('❌ Error loading campaigns:', error);
+                
+                if (error.name === 'AbortError') {
+                    console.error('⏱️ Request timeout');
+                }
+                
+                // Retry logic
+                if (currentRetryAttempt < API_CONFIG.retryAttempts) {
+                    currentRetryAttempt++;
+                    console.log(`🔄 Retrying... (${currentRetryAttempt}/${API_CONFIG.retryAttempts})`);
+                    setTimeout(loadCampaigns, 2000 * currentRetryAttempt); // Progressive delay
+                } else {
+                    showError();
+                }
+            }
+        }
+
+        // Function untuk retry manual
+        function retryLoadCampaigns() {
+            currentRetryAttempt = 0;
+            loadCampaigns();
+        }
+
+        // Show Loading State
+        function showLoading() {
+            loadingSection.style.display = 'block';
+            errorSection.style.display = 'none';
+            noDataSection.style.display = 'none';
+            campaignsGrid.style.display = 'none';
+        }
+
+        // Show Error State
+        function showError() {
+            loadingSection.style.display = 'none';
+            errorSection.style.display = 'block';
+            noDataSection.style.display = 'none';
+            campaignsGrid.style.display = 'none';
+        }
+
+        // Show No Data State
+        function showNoData() {
+            loadingSection.style.display = 'none';
+            errorSection.style.display = 'none';
+            noDataSection.style.display = 'block';
+            campaignsGrid.style.display = 'none';
+        }
+
+        // Display Campaigns
+        function displayCampaigns(campaigns) {
+            campaignsGrid.innerHTML = '';
+
+            campaigns.forEach((campaign, index) => {
+                const campaignCard = createCampaignCard(campaign, index);
+                campaignsGrid.appendChild(campaignCard);
+            });
+
+            // Show campaigns and hide loading states
+            loadingSection.style.display = 'none';
+            errorSection.style.display = 'none';
+            noDataSection.style.display = 'none';
+            campaignsGrid.style.display = 'flex';
+        }
+
+        // Create Campaign Card
+        function createCampaignCard(campaign, index) {
+            const col = document.createElement('div');
+            col.className = 'col-md-6 col-lg-4 mb-4';
+
+            // Handle image
+            const imageUrl = campaign.image || `https://via.placeholder.com/400x200/6c757d/ffffff?text=${encodeURIComponent(campaign.title)}`;
+            
+            // Truncate description
+            const description = campaign.short_description || campaign.description || '';
+            const maxLength = 100;
+            const truncatedDesc = description.length > maxLength 
+                ? description.substring(0, maxLength) + '...' 
+                : description;
+
+            col.innerHTML = `
+                <div class="card campaign-card h-100" data-aos="fade-up" data-aos-delay="${index * 100}">
+                    <img src="${imageUrl}" 
+                         class="card-img-top campaign-image" 
+                         alt="${campaign.title}"
+                         onerror="this.src='https://via.placeholder.com/400x200/6c757d/ffffff?text=${encodeURIComponent(campaign.title)}'">
+                    
+                    <div class="card-body d-flex flex-column">
+                        <div class="mb-2">
+                            <span class="campaign-category">${campaign.category || 'Donasi'}</span>
+                        </div>
+                        
+                        <h5 class="card-title">${campaign.title}</h5>
+                        <p class="card-text text-muted flex-grow-1">${truncatedDesc}</p>
+                        
+                        <div class="mb-3">
+                            <div class="campaign-target h6">${campaign.target_formatted || 'Target tidak tersedia'}</div>
+                            <small class="text-muted">📍 ${campaign.location || 'Lokasi tidak tersedia'}</small>
+                        </div>
+                        
+                        <div class="mt-auto">
+                            <a href="${campaign.donation_url}" 
+                               target="_blank" 
+                               rel="noopener noreferrer"
+                               class="btn btn-success w-100"
+                               onclick="trackDonationClick('${campaign.title}', ${campaign.id})">
+                                💝 Donasi Sekarang
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            return col;
+        }
+
+        // Track donation clicks (untuk analytics)
+        function trackDonationClick(campaignTitle, campaignId) {
+            console.log(`📊 User clicked donation for: ${campaignTitle} (ID: ${campaignId})`);
+            
+            // Kirim ke Google Analytics jika tersedia
+            if (typeof gtag !== 'undefined') {
+                gtag('event', 'click', {
+                    'event_category': 'donation',
+                    'event_label': campaignTitle,
+                    'value': campaignId
+                });
+            }
+
+            // Atau kirim ke endpoint analytics custom Anda
+            // fetch('/analytics/track-click', {
+            //     method: 'POST',
+            //     headers: { 'Content-Type': 'application/json' },
+            //     body: JSON.stringify({
+            //         campaign_id: campaignId,
+            //         campaign_title: campaignTitle,
+            //         source: 'company_profile',
+            //         timestamp: new Date().toISOString()
+            //     })
+            // }).catch(err => console.log('Analytics error:', err));
+        }
+
+        // Initialize when DOM ready
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🎉 Page loaded, starting campaign fetch...');
+            loadCampaigns();
+        });
+
+        // Optional: Auto refresh setiap 5 menit
+        // setInterval(loadCampaigns, 5 * 60 * 1000);
+
+        // Optional: Retry when page becomes visible again
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden && campaignsGrid.style.display === 'none') {
+                console.log('👀 Page visible again, retrying...');
+                loadCampaigns();
+            }
+        });
+    </script>
+
+    <!-- Optional: AOS Animation Library -->
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script>
+        // Initialize AOS animations
+        document.addEventListener('DOMContentLoaded', function() {
+            AOS.init({
+                duration: 800,
+                once: true
+            });
+        });
+    </script>
+</body>
+</html>

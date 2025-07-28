@@ -1,0 +1,36 @@
+{
+  "name": "company-profile-donasi",
+  "version": "1.0.0",
+  "description": "Company Profile website with donation campaigns integration",
+  "main": "nodejs-server-example.js",
+  "scripts": {
+    "start": "node nodejs-server-example.js",
+    "dev": "nodemon nodejs-server-example.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "nodejs",
+    "express",
+    "ejs",
+    "donation",
+    "api",
+    "company-profile"
+  ],
+  "author": "Your Company",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "ejs": "^3.1.9",
+    "axios": "^1.6.0",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  }
+}
