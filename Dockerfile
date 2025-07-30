@@ -36,6 +36,9 @@ RUN printf '<VirtualHost *:80>\n\
 RUN composer install --no-interaction --optimize-autoloader \
     && npm install
 
+# Run storage link
+RUN php artisan storage:link
+
 # Set permission
 RUN chmod -R 775 storage bootstrap/cache \
     && chown -R www-data:www-data .
